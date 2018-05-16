@@ -1,0 +1,136 @@
+---
+title: "Prediction_Model"
+author: "Kingery"
+date: "5/4/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Beginning Project 
+``` {r}
+getwd()
+setwd("/Users/Nelson/Desktop/Prediction_Project")
+testing <- read.csv("testing.csv")
+training <- read.csv("training.csv")
+```
+
+Filling and Omitting NA 
+(only trial runs, do not run)
+
+```{r}
+#train2 <- read.csv("training.csv", header=T, na.strings = c("", "NA"))
+#testing1<- na.omit(test2)
+#training1<- na.omit(train2)
+#trial 1
+
+#na_vec <- which(!complete.cases(train2))
+#training1 <- train2[-na_vec, ]
+
+#na_vec1 <- which(!complete.cases(testing))
+#testing1 <- testing[-na_vec1]
+#trial 2
+```
+
+Cleaning and Omitting NA's 
+(finalized)
+``` {r}
+testing2 <- Filter(function(x)!all(is.na(x) || is.null(x) || x == "" || x == 0), testing) 
+
+testing2$problem_id <-NULL #excluding column pobrlem id
+training2 <- training[ , colSums(is.na(training)) == 0]
+testing2names <- colnames(testing2)
+write.table(testing2names, file="testingnames.txt")
+training3names <- colnames(training2)
+write.table(training3names, file="training1names.txt")
+
+training3 <- training2[ -c(12:20,43:48,52:60,74:82) ]
+#93 to 60 variables by including everything except columns with no values 
+
+#testing 2 and training 3 are main datasets as of this point
+
+
+levels.time <- levels(training2$cvtd_timestamp)
+levels(testing2$cvtd_timestamp) <- levels.time
+levels.window <- levels(training3$new_window)
+levels(testing2$new_window) <- levels.window
+
+```
+Partitioning Data
+```{r}
+set.seed(1)
+traing4<- sample(1: nrow(training3), size=.7*nrow(training3))
+#70:30 ratio
+trainingA<- training3[traing4, ]
+testA<- training3[-traing4, ]
+
+```
+Save csv
+```{r}
+write.csv(trainingA, file="trainingclean.csv", row.names = FALSE)
+write.csv(testA, file="testingclean.csv", row.names = FALSE)
+```
+
+Installing Packages for SVM
+```{r}
+install.packages("e1071")
+library(e1071)
+install.packages("caret")
+library(caret)
+```
+
+Running SVM 
+```{r}
+#model_svm<- svm(classe ~ . -X -user_name, data = training3)
+#trial1
+#mymodel <- svm(classe~. -X -user_name -cvtd_timestamp -new_window, data = training3)
+#trial2
+#mymodel1 <- svm(classe~. -X -user_name -cvtd_timestamp -new_window, data = training3, kernel="radial", gamma=1,cost=1)
+#trial3
+
+mymodel2 <- svm(classe~. -X -user_name -cvtd_timestamp -new_window, data = trainingA, kernel="radial",cost= 2^(2:9)) 
+#trial 4
+
+#cost captures cost of constraint. cost is to high then the model might store to many support vectors = over fitting vs. underfitting with a low cost. ranges = list(epsilon =seq(0,1,0.1), cost = 2(^(2:9))
+
+#tmodel<- tune(svm, classe~. -X -user_name -cvtd_timestamp -new_window, data = trainingA, ranges = list(epsilon = seq(0,1,0.1), cost = 2^(2:9))) #trial 5
+
+mymodel3 <- svm(classe~. -X -user_name -cvtd_timestamp -new_window, data = trainingA, kernel="radial",cost= 2^(2:9), cross=10) 
+#trial 6 with k-form cross validation
+
+mymodel4 <- svm(classe~. -X -user_name -cvtd_timestamp -new_window, data = trainingA, kernel="radial",cost= 2^(2:5), cross=10) 
+#trial 6 reduced cost
+
+
+#cross = 10 
+#cost = 1 ... start small (regularizing and cross validating)
+#predict with confusionMatrix that is in package in caret library
+#run, predict, then feed stored pred in confusion matrix.
+
+myprediction<- predict(mymodel2, testA, type="vector")
+#prediction1
+mycomparison<- confusionMatrix(myprediction, testA$classe)
+#comparison1
+mycomparison
+
+myprediction2<- predict(mymodel3, testA, type="vector")
+#prediction2
+mycomparison2<- confusionMatrix(myprediction2, testA$classe)
+#comparison2
+mycomparison2
+
+myprediction3<- predict(mymodel4, testA, type="vector")
+#prediction3
+mycomparison3<- confusionMatrix(myprediction3, testA$classe)
+mycomparison3
+
+#tmodel1<- tune(svm, classe~. -X -user_name -cvtd_timestamp -new_window, data = trainingA, ranges = list(epsilon = seq(0,1,0.1), cost = 2^(2:9)))
+#tuning needs work to match bigger data set
+#run time is too long
+
+
+```
+
+
